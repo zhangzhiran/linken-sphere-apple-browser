@@ -1,0 +1,12 @@
+{
+    "browse_duration": 60,
+    "major_cycles": 3,
+    "minor_cycles_per_major": 8,
+    "max_retries": 3,
+    "linken_api_port": 36555,
+    "debug_port": 12345,
+    "max_threads": 3,
+    "retry_delay": 5,
+    "auto_save_logs": true,
+    "log_level": "INFO"
+}

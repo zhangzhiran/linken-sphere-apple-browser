@@ -1,0 +1,7 @@
+version: '3.8'
+services:
+  builder:
+    build: .
+    volumes:
+      - ./dist:/app/dist
+    command: python3 build_cross_platform.py

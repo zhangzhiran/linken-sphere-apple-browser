@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="128" cy="128" r="120" fill="#1e1e1e" stroke="#0d7377" stroke-width="8"/>
+  
+  <!-- Apple-like shape -->
+  <path d="M128 40 C 100 40, 80 60, 80 88 C 80 116, 100 136, 128 136 C 156 136, 176 116, 176 88 C 176 60, 156 40, 128 40 Z" fill="#ffffff"/>
+  
+  <!-- Leaf -->
+  <path d="M140 45 C 145 40, 155 42, 158 48 C 160 52, 155 55, 150 53 C 145 51, 142 48, 140 45 Z" fill="#28a745"/>
+  
+  <!-- Link/Chain symbol -->
+  <circle cx="100" cy="180" r="20" fill="none" stroke="#0d7377" stroke-width="6"/>
+  <circle cx="156" cy="180" r="20" fill="none" stroke="#0d7377" stroke-width="6"/>
+  <line x1="120" y1="180" x2="136" y2="180" stroke="#0d7377" stroke-width="6"/>
+  
+  <!-- Browser window -->
+  <rect x="60" y="120" width="136" height="80" rx="8" fill="none" stroke="#ffffff" stroke-width="3"/>
+  <line x1="60" y1="135" x2="196" y2="135" stroke="#ffffff" stroke-width="2"/>
+  <circle cx="75" cy="127" r="3" fill="#ff5f56"/>
+  <circle cx="90" cy="127" r="3" fill="#ffbd2e"/>
+  <circle cx="105" cy="127" r="3" fill="#27ca3f"/>
+</svg>
