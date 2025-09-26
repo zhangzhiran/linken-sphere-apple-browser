@@ -11,9 +11,9 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [macos-latest]
         python-version: ['3.10']
-    
+
     runs-on: ${{ matrix.os }}
     
     steps:
@@ -25,14 +25,7 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     
-    - name: Install system dependencies (Ubuntu)
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y python3-tk python3-dev build-essential
-    
     - name: Install system dependencies (macOS)
-      if: matrix.os == 'macos-latest'
       run: |
         # macOS通常已包含必要工具
         brew install --cask xquartz || true
@@ -63,34 +56,13 @@ jobs:
       run: |
         ls -la dist/
     
-    - name: Upload Windows artifacts
-      if: matrix.os == 'windows-latest'
-      uses: actions/upload-artifact@v4
-      with:
-        name: LinkenSphereAppleBrowser-Windows
-        path: |
-          dist/LinkenSphereAppleBrowser.exe
-          dist/app_icon.ico
-          dist/使用说明.txt
-
     - name: Upload macOS artifacts
-      if: matrix.os == 'macos-latest'
       uses: actions/upload-artifact@v4
       with:
         name: LinkenSphereAppleBrowser-macOS
         path: |
           dist/LinkenSphereAppleBrowser
           dist/app_icon.icns
-          dist/app_icon.png
-          dist/使用说明.txt
-
-    - name: Upload Linux artifacts
-      if: matrix.os == 'ubuntu-latest'
-      uses: actions/upload-artifact@v4
-      with:
-        name: LinkenSphereAppleBrowser-Linux
-        path: |
-          dist/LinkenSphereAppleBrowser
           dist/app_icon.png
           dist/使用说明.txt
 
@@ -112,38 +84,26 @@ jobs:
         tag_name: v${{ github.run_number }}
         release_name: Linken Sphere Apple Browser v${{ github.run_number }}
         body: |
-          ## 🎉 Linken Sphere Apple Browser - Cross-Platform Release
-          
-          ### 📦 Available Downloads:
-          - **Windows**: LinkenSphereAppleBrowser.exe
+          ## � Linken Sphere Apple Browser - macOS Release
+
+          ### 📦 Available Download:
           - **macOS**: LinkenSphereAppleBrowser (macOS binary)
-          - **Linux**: LinkenSphereAppleBrowser (Linux binary)
-          
+
           ### 🚀 Usage:
-          1. Download the appropriate file for your operating system
-          2. Ensure Linken Sphere is running on your system
-          3. Run the downloaded executable
-          
+          1. Download the macOS binary
+          2. Ensure Linken Sphere is running on your Mac
+          3. Run the downloaded executable: `./LinkenSphereAppleBrowser`
+
           ### ✅ Features:
           - Multi-threaded Apple website browsing
           - Individual thread control (pause/resume/stop)
           - Linken Sphere fingerprint protection
           - Configuration save/load
           - Real-time logging
-          
+
           Built automatically from commit: ${{ github.sha }}
         draft: false
         prerelease: false
-    
-    - name: Upload Windows Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./LinkenSphereAppleBrowser-Windows/LinkenSphereAppleBrowser.exe
-        asset_name: LinkenSphereAppleBrowser-Windows.exe
-        asset_content_type: application/octet-stream
     
     - name: Upload macOS Release Asset
       uses: actions/upload-release-asset@v1
@@ -153,14 +113,4 @@ jobs:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./LinkenSphereAppleBrowser-macOS/LinkenSphereAppleBrowser
         asset_name: LinkenSphereAppleBrowser-macOS
-        asset_content_type: application/octet-stream
-    
-    - name: Upload Linux Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./LinkenSphereAppleBrowser-Linux/LinkenSphereAppleBrowser
-        asset_name: LinkenSphereAppleBrowser-Linux
         asset_content_type: application/octet-stream
