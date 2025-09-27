@@ -292,12 +292,29 @@ class CrossPlatformBuilder:
         """构建macOS应用程序包"""
         print("🍎 构建macOS应用程序包...")
 
+        # 检查是否在macOS上运行
+        is_native_macos = platform.system() == "Darwin"
+
+        if is_native_macos:
+            print("✅ 在原生macOS系统上构建")
+        else:
+            print("⚠️ 在非macOS系统上构建，可能需要在macOS上测试")
+
         icon_path = self.icon_files["Darwin"]
 
-        # 确保ICNS图标存在
+        # 确保ICNS图标存在，如果不存在则尝试创建
         if not os.path.exists(icon_path):
-            print(f"❌ macOS图标文件不存在: {icon_path}")
-            return False
+            print(f"⚠️ macOS图标文件不存在: {icon_path}")
+            if os.path.exists("app_icon.png"):
+                print("🔄 尝试从PNG创建ICNS图标...")
+                if self.create_icns_from_png():
+                    print("✅ ICNS图标创建成功")
+                else:
+                    print("❌ ICNS图标创建失败，使用PNG图标")
+                    icon_path = "app_icon.png"
+            else:
+                print("❌ 没有找到任何图标文件")
+                return False
 
         # 获取绝对路径
         icon_abs_path = os.path.abspath(icon_path)
@@ -312,9 +329,20 @@ class CrossPlatformBuilder:
             "--distpath", self.build_dir,
             "--workpath", self.work_dir,
             "--specpath", self.spec_dir,
-            "--clean",
-            "--icon", icon_abs_path
+            "--clean"
         ]
+
+        # 只在有有效图标时添加图标参数
+        if os.path.exists(icon_abs_path):
+            cmd.extend(["--icon", icon_abs_path])
+
+        # macOS特定优化
+        if is_native_macos:
+            # 添加macOS特定的优化选项
+            cmd.extend([
+                "--osx-bundle-identifier", f"com.linkensphere.{self.app_name.lower()}",
+                "--target-arch", "universal2"  # 支持Intel和Apple Silicon
+            ])
 
         # 添加数据文件
         for data_file in self.get_data_files():
@@ -325,27 +353,85 @@ class CrossPlatformBuilder:
 
         # 添加主脚本
         cmd.append(script_abs_path)
-        
+
         try:
+            print("🔨 开始PyInstaller构建...")
             subprocess.run(cmd, check=True)
-            
+
             # 复制图标到输出目录
-            if os.path.exists(self.icon_files["Darwin"]):
-                shutil.copy2(self.icon_files["Darwin"], 
-                           os.path.join(self.build_dir, self.icon_files["Darwin"]))
-            
-            app_path = os.path.join(self.build_dir, f"{self.app_name}")
-            if os.path.exists(app_path):
-                size = os.path.getsize(app_path) / (1024 * 1024)
-                print(f"✅ macOS构建完成: {app_path} ({size:.1f} MB)")
-                
-                # 创建DMG文件（如果可能）
-                self.create_dmg()
-                return True
+            if os.path.exists(icon_path):
+                dest_icon = os.path.join(self.build_dir, os.path.basename(icon_path))
+                shutil.copy2(icon_path, dest_icon)
+                print(f"📋 图标已复制: {dest_icon}")
+
+            if is_native_macos:
+                # 在原生macOS上构建
+                app_path = os.path.join(self.build_dir, f"{self.app_name}")
+                app_bundle_path = os.path.join(self.build_dir, f"{self.app_name}.app")
+
+                if os.path.exists(app_bundle_path):
+                    # PyInstaller创建了.app包
+                    size = self.get_directory_size(app_bundle_path) / (1024 * 1024)
+                    print(f"✅ macOS应用包构建完成: {app_bundle_path} ({size:.1f} MB)")
+
+                    # 设置可执行权限
+                    executable_path = os.path.join(app_bundle_path, "Contents", "MacOS", self.app_name)
+                    if os.path.exists(executable_path):
+                        os.chmod(executable_path, 0o755)
+                        print("✅ 可执行权限已设置")
+
+                    # 创建DMG文件
+                    if self.create_dmg():
+                        print("✅ DMG安装包创建成功")
+
+                    return True
+
+                elif os.path.exists(app_path):
+                    # PyInstaller创建了单个可执行文件
+                    size = os.path.getsize(app_path) / (1024 * 1024)
+                    print(f"✅ macOS可执行文件构建完成: {app_path} ({size:.1f} MB)")
+
+                    # 设置可执行权限
+                    os.chmod(app_path, 0o755)
+                    print("✅ 可执行权限已设置")
+
+                    # 创建启动脚本
+                    self.create_macos_launcher()
+
+                    return True
+                else:
+                    print("❌ macOS构建失败: 应用程序未生成")
+                    return False
             else:
-                print("❌ macOS构建失败: 应用程序未生成")
-                return False
-                
+                # 在非macOS系统上构建
+                exe_path = os.path.join(self.build_dir, f"{self.app_name}.exe")
+                app_path = os.path.join(self.build_dir, f"{self.app_name}")
+
+                if os.path.exists(exe_path):
+                    # 重命名为macOS可执行文件（无扩展名）
+                    if os.path.exists(app_path):
+                        os.remove(app_path)
+                    shutil.move(exe_path, app_path)
+
+                    size = os.path.getsize(app_path) / (1024 * 1024)
+                    print(f"✅ macOS构建完成: {app_path} ({size:.1f} MB)")
+                    print("⚠️ 注意: 此文件在非macOS系统上构建，需要在macOS上测试")
+
+                    # 创建macOS专用的启动脚本
+                    self.create_macos_launcher()
+                    return True
+                elif os.path.exists(app_path):
+                    size = os.path.getsize(app_path) / (1024 * 1024)
+                    print(f"✅ macOS构建完成: {app_path} ({size:.1f} MB)")
+                    print("⚠️ 注意: 此文件在非macOS系统上构建，需要在macOS上测试")
+
+                    # 创建macOS专用的启动脚本
+                    self.create_macos_launcher()
+                    return True
+                else:
+                    print("❌ macOS构建失败: 可执行文件未生成")
+                    return False
+
         except subprocess.CalledProcessError as e:
             print(f"❌ macOS构建失败: {e}")
             return False
@@ -491,12 +577,178 @@ class CrossPlatformBuilder:
             print("\n✅ 跨平台兼容性验证通过")
             return True
 
+    def create_icns_from_png(self):
+        """从PNG创建ICNS图标文件"""
+        try:
+            if platform.system() == "Darwin":
+                # 在macOS上使用sips命令
+                cmd = [
+                    "sips", "-s", "format", "icns",
+                    "app_icon.png", "--out", "app_icon.icns"
+                ]
+                subprocess.run(cmd, check=True, capture_output=True)
+                return True
+            else:
+                # 在其他系统上尝试使用PIL
+                try:
+                    from PIL import Image
+                    img = Image.open("app_icon.png")
+                    # 创建多个尺寸的图标
+                    sizes = [16, 32, 64, 128, 256, 512, 1024]
+                    icons = []
+                    for size in sizes:
+                        resized = img.resize((size, size), Image.Resampling.LANCZOS)
+                        icons.append(resized)
+
+                    # 保存为ICNS（需要pillow-heif支持）
+                    icons[0].save("app_icon.icns", format="ICNS",
+                                append_images=icons[1:], save_all=True)
+                    return True
+                except ImportError:
+                    print("⚠️ PIL不可用，无法创建ICNS图标")
+                    return False
+        except Exception as e:
+            print(f"⚠️ 创建ICNS图标失败: {e}")
+            return False
+
+    def get_directory_size(self, path):
+        """获取目录大小"""
+        total_size = 0
+        for dirpath, _, filenames in os.walk(path):
+            for filename in filenames:
+                filepath = os.path.join(dirpath, filename)
+                if os.path.exists(filepath):
+                    total_size += os.path.getsize(filepath)
+        return total_size
+
+    def create_dmg(self):
+        """创建macOS DMG安装包"""
+        if platform.system() != "Darwin":
+            print("⚠️ DMG创建需要在macOS上运行")
+            return False
+
+        try:
+            dmg_name = f"{self.app_name}.dmg"
+            dmg_path = os.path.join(self.build_dir, dmg_name)
+
+            # 删除已存在的DMG
+            if os.path.exists(dmg_path):
+                os.remove(dmg_path)
+
+            # 查找应用包或可执行文件
+            app_bundle = os.path.join(self.build_dir, f"{self.app_name}.app")
+            app_executable = os.path.join(self.build_dir, self.app_name)
+
+            source_path = app_bundle if os.path.exists(app_bundle) else app_executable
+
+            if not os.path.exists(source_path):
+                print("❌ 找不到要打包的应用程序")
+                return False
+
+            # 创建DMG
+            cmd = [
+                "hdiutil", "create", "-volname", self.app_name,
+                "-srcfolder", source_path,
+                "-ov", "-format", "UDZO", dmg_path
+            ]
+
+            subprocess.run(cmd, check=True, capture_output=True)
+
+            if os.path.exists(dmg_path):
+                size = os.path.getsize(dmg_path) / (1024 * 1024)
+                print(f"✅ DMG创建成功: {dmg_path} ({size:.1f} MB)")
+                return True
+            else:
+                print("❌ DMG创建失败")
+                return False
+
+        except subprocess.CalledProcessError as e:
+            print(f"❌ DMG创建失败: {e}")
+            return False
+        except Exception as e:
+            print(f"❌ DMG创建出错: {e}")
+            return False
+
+    def create_macos_launcher(self):
+        """创建macOS启动脚本"""
+        launcher_content = f'''#!/bin/bash
+# macOS启动脚本 for {self.app_name}
+
+# 获取脚本所在目录
+DIR="$( cd "$( dirname "${{BASH_SOURCE[0]}}" )" &> /dev/null && pwd )"
+
+# 设置可执行权限
+chmod +x "$DIR/{self.app_name}"
+
+# 启动应用程序
+"$DIR/{self.app_name}" "$@"
+'''
+
+        launcher_path = os.path.join(self.build_dir, f"start_{self.app_name}.sh")
+        with open(launcher_path, 'w', encoding='utf-8') as f:
+            f.write(launcher_content)
+
+        print(f"✅ 创建macOS启动脚本: start_{self.app_name}.sh")
+
+        # 创建macOS安装说明
+        install_guide = f'''# macOS 安装说明
+
+## 安装步骤
+
+1. 将以下文件复制到 Applications 文件夹或任意位置：
+   - {self.app_name} (主程序)
+   - start_{self.app_name}.sh (启动脚本)
+   - app_icon.icns (图标文件)
+   - 其他相关文件
+
+2. 打开终端，导航到文件所在目录
+
+3. 设置可执行权限：
+   ```bash
+   chmod +x {self.app_name}
+   chmod +x start_{self.app_name}.sh
+   ```
+
+4. 运行程序：
+   ```bash
+   ./start_{self.app_name}.sh
+   ```
+   或者直接运行：
+   ```bash
+   ./{self.app_name}
+   ```
+
+## 故障排除
+
+如果遇到"无法打开，因为它来自身份不明的开发者"错误：
+
+1. 右键点击应用程序
+2. 选择"打开"
+3. 在弹出的对话框中点击"打开"
+
+或者在终端中运行：
+```bash
+xattr -d com.apple.quarantine {self.app_name}
+```
+
+## 系统要求
+
+- macOS 10.15 或更高版本
+- Linken Sphere 浏览器
+'''
+
+        guide_path = os.path.join(self.build_dir, "macOS_安装说明.txt")
+        with open(guide_path, 'w', encoding='utf-8') as f:
+            f.write(install_guide)
+
+        print(f"✅ 创建macOS安装说明: macOS_安装说明.txt")
+
     def create_dmg(self):
         """创建macOS DMG安装包"""
         try:
             dmg_name = f"{self.app_name}.dmg"
             app_path = os.path.join(self.build_dir, self.app_name)
-            
+
             if os.path.exists(app_path):
                 # 使用hdiutil创建DMG
                 subprocess.run([
@@ -504,9 +756,9 @@ class CrossPlatformBuilder:
                     "-srcfolder", app_path, "-ov", "-format", "UDZO",
                     os.path.join(self.build_dir, dmg_name)
                 ], check=True, capture_output=True)
-                
+
                 print(f"✅ 创建DMG安装包: {dmg_name}")
-            
+
         except (subprocess.CalledProcessError, FileNotFoundError):
             print("⚠️ 无法创建DMG安装包")
     
